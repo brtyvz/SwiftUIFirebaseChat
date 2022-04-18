@@ -7,15 +7,18 @@
 
 import SwiftUI
 import Firebase
-
+import FirebaseFirestore
 class FirebaseMenager:NSObject{
     let auth : Auth
     let storage : Storage
+    let firestore : Firestore
     static let shared = FirebaseMenager()
    override init () {
         FirebaseApp.configure()
         self.auth = Auth.auth()
     self.storage = Storage.storage()
+    self.firestore = Firestore.firestore()
+
         super.init()
     }
 }
@@ -137,9 +140,29 @@ struct LoginView: View {
                     return
                 }
                 self.loginErrorHandle = "Succesfuly  retrieve image\(url?.absoluteString ?? "")"
+           
+                guard let url = url else {return}; self.storeUserInformation(imageProfileUrl: url)
+               
+                
             }
         }
        
+        
+    }
+    private func storeUserInformation(imageProfileUrl:URL){
+        guard let uid = FirebaseMenager.shared.auth.currentUser?.uid
+        else{return}
+        let userData = ["email":self.email,"uid":uid,"profileImageUrl":imageProfileUrl.absoluteString]
+        FirebaseMenager.shared.firestore.collection("users")
+            .document(uid).setData(userData){ err in
+                if let err = err{
+                    self.loginErrorHandle = "Failed to upload userData to firebase"
+                    print(err)
+                    return
+                }
+                
+                print("succes")
+            }
         
     }
     
