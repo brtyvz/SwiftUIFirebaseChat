@@ -6,15 +6,68 @@
 //
 
 import SwiftUI
+import SDWebImageSwiftUI
+struct ChatUser{
+    let uid,email,profieImageUrl : String
+}
+class MainMessagesViewModel : ObservableObject{
+    @Published var errorMessage = ""
+    @Published var chatUser : ChatUser?
+    init(){
+        fetchCurrentUser()
+    }
+    
+    
+  private  func fetchCurrentUser (){
+      guard let uid = FirebaseMenager.shared.auth.currentUser?.uid
+      else{
+          self.errorMessage = "ERROR"
+            return}
+     
+      FirebaseMenager.shared.firestore.collection("users")
+          .document(uid).getDocument { snapshot, error in
+              if let error = error{
+                  self.errorMessage = "error"
+              }
+              guard let data = snapshot?.data()
+              else{
+                  self.errorMessage = "efefef"
+                  return}
+             let uid = data["uid"] as? String ?? ""
+              let email = data["email"] as? String ?? ""
+              let profileImageUrl = data["profileImageUrl"] as? String ?? ""
+              
+              self.chatUser = ChatUser(uid: uid, email: email, profieImageUrl: profileImageUrl)
+              
+          }
+      
+    }
+    
+}
 
 struct MainMessage: View {
     @State var shouldShowLogOutOptions = false
+    @ObservedObject private var vm = MainMessagesViewModel()
+    
     private var customNavBar : some View{
+        
         HStack(spacing:16){
-            Image(systemName:"person.fill")
-                .font(.system(size: 34,weight: .heavy))
+           
+            WebImage(url: URL(string:vm.chatUser?.profieImageUrl ?? ""))
+                .resizable()
+                .scaledToFill()
+                .frame(width: 50, height: 50)
+                .clipped()
+                .cornerRadius(50.0)
+                .font(.system(size: 50))
+                    
+                        .overlay(RoundedRectangle(cornerRadius: 44)
+                            .stroke(Color(.label),lineWidth: 1)
+                            )
+
             VStack(alignment: .leading , spacing: 4){
-                Text("USERNAME")
+                let email = vm.chatUser?.email.replacingOccurrences(of: "@gmail.com", with: "") ?? ""
+                Text(email)
                     .font(.system(size: 24, weight: .bold))
                 
                 HStack{
@@ -49,7 +102,7 @@ struct MainMessage: View {
     var body: some View {
         NavigationView{
             VStack{
-  
+              
               customNavBar
                 messageView
           
