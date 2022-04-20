@@ -15,10 +15,11 @@ import FirebaseFirestore
 
 
 struct LoginView: View {
-    @State var isLoginMode = true
-    @State var email = ""
-    @State var password = ""
-    @State var shouldShowImagePicker = false
+    let didComplateLoginProcess: () -> ()
+    @State private var isLoginMode = true
+    @State  private var email = ""
+    @State private var password = ""
+    @State private var shouldShowImagePicker = false
     var body: some View {
         NavigationView{
             ScrollView{
@@ -92,6 +93,7 @@ struct LoginView: View {
                 return
             }
             print("Loggin Successful")
+            self.didComplateLoginProcess()
         }
         
     }
@@ -100,6 +102,9 @@ struct LoginView: View {
     //Register Func
     @State var loginErrorHandle = ""
     private func createAccount(){
+        if  self.image == nil {
+            self.loginErrorHandle = "You Have to pick avatar"
+        }
         FirebaseMenager.shared.auth.createUser(withEmail: self.email, password: self.password) { Result, error in
             if let error = error{
                 self.loginErrorHandle = "Failed to create user: \(error.localizedDescription)"
@@ -130,7 +135,7 @@ struct LoginView: View {
                 self.loginErrorHandle = "Succesfuly  retrieve image\(url?.absoluteString ?? "")"
            
                 guard let url = url else {return}; self.storeUserInformation(imageProfileUrl: url)
-               
+             
                 
             }
         }
@@ -150,6 +155,7 @@ struct LoginView: View {
                 }
                 
                 print("succes")
+                self.didComplateLoginProcess()
             }
         
     }
@@ -158,6 +164,6 @@ struct LoginView: View {
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-        LoginView()
+        LoginView(didComplateLoginProcess: {})
     }
 }
