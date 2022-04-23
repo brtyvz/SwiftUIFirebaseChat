@@ -35,11 +35,11 @@ class MainMessagesViewModel : ObservableObject{
               else{
                   self.errorMessage = "efefef"
                   return}
-             let uid = data["uid"] as? String ?? ""
-              let email = data["email"] as? String ?? ""
-              let profileImageUrl = data["profileImageUrl"] as? String ?? ""
+              _ = data["uid"] as? String ?? ""
+              _ = data["email"] as? String ?? ""
+              _ = data["profileImageUrl"] as? String ?? ""
               
-              self.chatUser = ChatUser(uid: uid, email: email, profieImageUrl: profileImageUrl)
+              self.chatUser = ChatUser(data: data)
               
           }
       
@@ -55,6 +55,7 @@ class MainMessagesViewModel : ObservableObject{
 
 struct MainMessage: View {
     @State var shouldShowLogOutOptions = false
+    @State var shouldNavigateToChatView = false
     @ObservedObject private var vm = MainMessagesViewModel()
     
     private var customNavBar : some View{
@@ -123,7 +124,9 @@ struct MainMessage: View {
               
               customNavBar
                 messageView
-          
+                NavigationLink("", isActive: $shouldNavigateToChatView) {
+                    ChatLogView(chatUser: self.chatUser)
+                }
                 
             }.overlay(
               newMessageButton
@@ -135,32 +138,38 @@ struct MainMessage: View {
     private var messageView:some View{
         ScrollView{
             ForEach (0...10, id: \.self ){ num in
-           
-                    VStack{
-                        HStack(spacing:16){
-                        Image(systemName: "person.fill").font(.system(size: 32))
-                                .padding(6)
-                                .overlay(RoundedRectangle(cornerRadius: 34)
-                                    .stroke(Color(.label),lineWidth: 1)
-                                    )
-                        VStack(alignment: .leading){
-                            Text("username").font(.system(size: 16,weight: .bold))
-                            Text("message to user").font(.system(size: 14))
-                                .foregroundColor(.gray)
-                        }
-                        Spacer()
-                        Text("22d").font(.system(size: 14,weight: .semibold))
+                NavigationLink {
+                    ChatLogView(chatUser: self.chatUser)
+                } label: {
+                    HStack(spacing:16){
+                    Image(systemName: "person.fill").font(.system(size: 32))
+                            .padding(6)
+                            .overlay(RoundedRectangle(cornerRadius: 34)
+                                .stroke(Color(.label),lineWidth: 1)
+                            ).foregroundColor(Color(.label))
+                    VStack(alignment: .leading){
+                        Text("username").font(.system(size: 16,weight: .bold)).foregroundColor(Color(.label))
+                        Text("message to user").font(.system(size: 14))
+                            .foregroundColor(.gray)
                     }
+                    Spacer()
+                        Text("22d").font(.system(size: 14,weight: .semibold)).foregroundColor(Color(.label))
+                }
+                }
+
+                    VStack{
+              
                     Divider()
                             .padding(.horizontal,8)
             }.padding(.horizontal)
             }.padding(.bottom,50)
         }
     }
+    @State var shouldShowNewMessageScreen = false
         private var newMessageButton : some View{
             
             Button{
-                
+                shouldShowNewMessageScreen.toggle()
             }label: {
                 HStack{
                     Spacer()
@@ -175,11 +184,28 @@ struct MainMessage: View {
                     .padding(.horizontal)
                     .shadow(radius: 15)
             }
-            
+            .fullScreenCover(isPresented: $shouldShowNewMessageScreen) {
+                CreateNewMessageView(didSelectNewUser: {
+                    user in
+                    print(user.email)
+                    
+                    self.shouldNavigateToChatView.toggle()
+                    self.chatUser = user
+                })
+            }
             
         }
-        
+    @State var chatUser : ChatUser?
 }
+
+
+
+
+
+
+
+
+
 
 struct MainMessage_Previews: PreviewProvider {
     static var previews: some View {
