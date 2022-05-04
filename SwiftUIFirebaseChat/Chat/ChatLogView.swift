@@ -7,12 +7,61 @@
 
 import SwiftUI
 import Firebase
+
+struct FirebaseConstants{
+    static let fromId = "fromId"
+    static let toId = "toId"
+    static let text = "text"
+}
+
+
+struct ChatMessage:Identifiable{
+    var id :String{documentId}
+    let fromId,toId,text:String
+    let documentId :String
+    init(documentId:String,data:[String:Any]){
+        self.documentId = documentId
+        self.fromId = data[FirebaseConstants.fromId] as? String ?? ""
+        self.toId = data [FirebaseConstants.toId] as? String  ?? ""
+        self.text = data [FirebaseConstants.text] as? String  ?? ""
+    }
+}
 class ChatLogViewModal:ObservableObject{
     @Published var chatText = ""
     @Published var errorMessage = ""
+    @Published var chatMessages = [ChatMessage]()
     let chatUser : ChatUser?
     init(chatUser:ChatUser?){
         self.chatUser = chatUser
+        fetchMessage()
+    }
+    private func fetchMessage () {
+        guard let fromId = FirebaseMenager.shared.auth.currentUser?.uid else{return}
+                
+        guard let  toId = chatUser?.uid else {return}
+        
+        FirebaseMenager.shared.firestore.collection("messages")
+            .document(fromId)
+            .collection(toId)
+            .addSnapshotListener { querySnapshot, error in
+                if let    error = error {
+                    self.errorMessage = "failed to listen for message"
+                    print(error)
+                    return
+                }
+                querySnapshot?.documentChanges.forEach({ change in
+                    if change.type == .added {
+                        let data = change.document.data()
+                  
+//                    let docId = change.documentID
+                    
+                        self.chatMessages.append(.init(documentId: change.document.documentID, data: data))
+                }
+                })
+            }
+        
+        
+        
     }
     func handleSend(){
         print(chatText)
@@ -26,7 +75,7 @@ class ChatLogViewModal:ObservableObject{
             .collection(fromId)
             .document()
       
-        let messageData = ["fromId":fromId , "toId":toId , "text":self.chatText,"timestap":Timestamp() ] as [String:Any]
+        let messageData = [FirebaseConstants.fromId:fromId , FirebaseConstants.toId:toId , FirebaseConstants.text:self.chatText,"timestap":Timestamp() ] as [String:Any]
         
         document.setData(messageData){error in
             if let error = error{
@@ -126,21 +175,44 @@ struct ChatLogView:View{
             
             if #available(iOS 15.0, *) {
                 ScrollView{
-                    ForEach(0..<10){num in
-                        HStack{
-                            
-                            Spacer()
-                            HStack{
-                                Text("Fake Message").foregroundColor(.white)
+                    ForEach(vm.chatMessages){message in
+                        VStack{
+                            if message.fromId == FirebaseMenager.shared.auth.currentUser?.uid {
+                                HStack{
+                                    
+                                    Spacer()
+                                    HStack{
+                                        Text(message.text).foregroundColor(.white)
+                                        
+                                    }
+                                    .frame(width: 190, height: 50)
+                                    .background(Color.blue)
+                                    .cornerRadius(20)
+                                    .padding(0)
+                                }
+                       
+                            }
+                            else{
+                                HStack{
+                                    
+                                    Spacer()
+                                    HStack{
+                                        Text(message.text).foregroundColor(.black)
+                                        
+                                    }
+                                    .frame(width: 190, height: 50)
+                                    .background(Color.white)
+                                    .cornerRadius(20)
+                                    .padding(0)
+                                }
+                       
                                 
                             }
-                            .frame(width: 190, height: 50)
-                            .background(Color.blue)
-                            .cornerRadius(20)
-                            .padding(0)
+                            
                         }
                         .padding(.horizontal)
                         .padding(.top,8)
+                 
                          
                     }
                     
