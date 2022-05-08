@@ -12,6 +12,9 @@ struct FirebaseConstants{
     static let fromId = "fromId"
     static let toId = "toId"
     static let text = "text"
+    static let timestamp = "timestamp"
+    static let profileImageUrl = "timestamp"
+    static let email = "email"
 }
 
 
@@ -24,6 +27,7 @@ struct ChatMessage:Identifiable{
         self.fromId = data[FirebaseConstants.fromId] as? String ?? ""
         self.toId = data [FirebaseConstants.toId] as? String  ?? ""
         self.text = data [FirebaseConstants.text] as? String  ?? ""
+        
     }
 }
 class ChatLogViewModal:ObservableObject{
@@ -58,6 +62,10 @@ class ChatLogViewModal:ObservableObject{
                         self.chatMessages.append(.init(documentId: change.document.documentID, data: data))
                 }
                 })
+                DispatchQueue.main.async {
+                    self.count += 1
+                }
+                
             }
         
         
@@ -82,7 +90,9 @@ class ChatLogViewModal:ObservableObject{
                 self.errorMessage = "Failed to save message into firebase\(error)"
             }
             print("ddd")
+            self.persistRecentMessage()
             self.chatText = ""
+            self.count += 1
         }
         let recipiantMessageDocument = FirebaseMenager.shared.firestore.collection("messages")
             .document(toId)
@@ -95,6 +105,38 @@ class ChatLogViewModal:ObservableObject{
             }
         }
     }
+    private func persistRecentMessage(){
+        guard let chatUser = chatUser else {
+            return
+        }
+
+        guard let uid = FirebaseMenager.shared.auth.currentUser?.uid else {return}
+        guard let toId = self.chatUser?.uid else {return}
+        
+        let document = FirebaseMenager.shared.firestore
+            .collection("recent_messages")
+            .document(uid)
+            .collection("messages")
+            .document(toId)
+        let data = [
+            FirebaseConstants.timestamp : Timestamp(),
+            FirebaseConstants.text:self.chatText,
+            FirebaseConstants.toId:toId,
+            FirebaseConstants.fromId:uid,
+            FirebaseConstants.profileImageUrl:chatUser.profieImageUrl,
+            FirebaseConstants.email:chatUser.email
+            
+            
+        ]  as [String : Any]
+        document.setData(data) { error in
+            if let error = error{
+                self.errorMessage="Failed tosave recent message\(error.localizedDescription)"
+                print("faiedl recent message")
+                return
+            }
+        }
+    }
+    @Published var count = 0
 }
 
 struct ChatLogView:View{
@@ -125,6 +167,7 @@ struct ChatLogView:View{
  
         .navigationTitle("  \(chatUser?.email ?? "" )")
             .navigationBarTitleDisplayMode(.inline)
+            
         
         
     }
@@ -158,6 +201,51 @@ struct ChatLogView:View{
         
         
     }
+    struct MessageView: View{
+        let message :ChatMessage
+        var body: some View{
+            
+            VStack{
+                if message.fromId == FirebaseMenager.shared.auth.currentUser?.uid {
+                    HStack{
+                        
+                        Spacer()
+                        HStack{
+                            Text(message.text).foregroundColor(.white)
+                            
+                        }
+                        .frame(width: 190, height: 50)
+                        .background(Color.blue)
+                        .cornerRadius(20)
+                        .padding(0)
+                    }
+           
+                }
+                else{
+                    HStack{
+                        
+                       
+                        HStack{
+                            Text(message.text).foregroundColor(.black)
+                            
+                        }
+                        .frame(width: 190, height: 50)
+                        .background(Color.white)
+                        .cornerRadius(20)
+                        .padding(0)
+                        Spacer()
+                    }
+           
+                    
+                }
+                
+            }
+            .padding(.horizontal)
+            .padding(.top,8)
+            
+            
+        }
+    }
     private struct DescriptionPlaceholder: View {
         var body: some View {
             HStack {
@@ -170,55 +258,30 @@ struct ChatLogView:View{
             }
         }
     }
+    static let emptyScrollToString = "Empty"
+    
     var messageView : some View{
         VStack{
             
             if #available(iOS 15.0, *) {
-                ScrollView{
-                    ForEach(vm.chatMessages){message in
-                        VStack{
-                            if message.fromId == FirebaseMenager.shared.auth.currentUser?.uid {
-                                HStack{
-                                    
-                                    Spacer()
-                                    HStack{
-                                        Text(message.text).foregroundColor(.white)
-                                        
-                                    }
-                                    .frame(width: 190, height: 50)
-                                    .background(Color.blue)
-                                    .cornerRadius(20)
-                                    .padding(0)
-                                }
-                       
+                ScrollView {
+                    ScrollViewReader { scrollViewProxy in
+                        VStack {
+                            ForEach(vm.chatMessages) { message in
+                                MessageView(message: message)
                             }
-                            else{
-                                HStack{
-                                    
-                                    Spacer()
-                                    HStack{
-                                        Text(message.text).foregroundColor(.black)
-                                        
-                                    }
-                                    .frame(width: 190, height: 50)
-                                    .background(Color.white)
-                                    .cornerRadius(20)
-                                    .padding(0)
-                                }
-                       
-                                
-                            }
+
+                            HStack{ Spacer() }
+                            .id(Self.emptyScrollToString)
+                        }
+                        .onReceive(vm.$count) { _ in
+                            withAnimation(.easeOut(duration: 0.5)) {
+                                scrollViewProxy.scrollTo(Self.emptyScrollToString, anchor: .bottom)
                             
                         }
-                        .padding(.horizontal)
-                        .padding(.top,8)
-                 
-                         
                     }
-                    
-                    HStack{Spacer()}
-                    
-                }.background(Color(.init(gray: 0.95, alpha: 1)))
+                }}
+                .background(Color(.init(gray: 0.95, alpha: 1)))
                     .safeAreaInset(edge: .bottom) {
                         chatBottomBar
                             .background(Color(.systemBackground).ignoresSafeArea())

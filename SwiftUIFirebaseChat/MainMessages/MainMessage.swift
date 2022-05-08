@@ -7,6 +7,27 @@
 
 import SwiftUI
 import SDWebImageSwiftUI
+import Firebase
+struct RecentMessage: Identifiable {
+
+    var id: String { documentId }
+
+    let documentId: String
+    let text, email: String
+    let fromId, toId: String
+    let profileImageUrl: String
+    let timestamp: Timestamp
+
+    init(documentId: String, data: [String: Any]) {
+        self.documentId = documentId
+        self.text = data[FirebaseConstants.text] as? String ?? ""
+        self.fromId = data[FirebaseConstants.fromId] as? String ?? ""
+        self.toId = data[FirebaseConstants.toId] as? String ?? ""
+        self.profileImageUrl = data[FirebaseConstants.profileImageUrl] as? String ?? ""
+        self.email = data[FirebaseConstants.email] as? String ?? ""
+        self.timestamp = data[FirebaseConstants.timestamp] as? Timestamp ?? Timestamp(date: Date())
+    }
+}
 
 class MainMessagesViewModel : ObservableObject{
     @Published var errorMessage = ""
@@ -16,7 +37,39 @@ class MainMessagesViewModel : ObservableObject{
         DispatchQueue.main.async {
             self.isUserCurrentlyLogOut = FirebaseMenager.shared.auth.currentUser?.uid == nil
         }
+        
         fetchCurrentUser()
+        fetchRecentMessages()
+    }
+    @Published var recentMessages = [RecentMessage]()
+    
+    private func fetchRecentMessages(){
+        guard let uid = FirebaseMenager.shared.auth.currentUser?.uid else{return}
+        
+        FirebaseMenager.shared.firestore
+            .collection("recent_messages")
+            .document(uid)
+            .collection("messages")
+            .order(by: "timestamp")
+            .addSnapshotListener {querySnapshot,error in
+                
+                if let error = error{ self.errorMessage = "Failed to listen recent messsages\(error)"}
+                
+                querySnapshot?.documentChanges.forEach({ change in
+                    let docId = change.document.documentID
+                    if let index = self.recentMessages.firstIndex(where: { rm in
+                        return rm.documentId == docId
+                    }) {
+                    self.recentMessages.remove(at: index)
+                    }
+                        self.recentMessages.append(.init(documentId: docId, data:change.document.data()))
+                    
+                    
+                })
+                
+            }
+       
+        
     }
     
     
@@ -61,7 +114,7 @@ struct MainMessage: View {
     private var customNavBar : some View{
         
         HStack(spacing:16){
-           
+          
             WebImage(url: URL(string:vm.chatUser?.profieImageUrl ?? ""))
                 .resizable()
                 .scaledToFill()
@@ -137,19 +190,27 @@ struct MainMessage: View {
     }
     private var messageView:some View{
         ScrollView{
-            ForEach (0...10, id: \.self ){ num in
+            ForEach (vm.recentMessages ){ recentMessage in
                 NavigationLink {
                     ChatLogView(chatUser: self.chatUser)
                 } label: {
                     HStack(spacing:16){
-                    Image(systemName: "person.fill").font(.system(size: 32))
-                            .padding(6)
-                            .overlay(RoundedRectangle(cornerRadius: 34)
-                                .stroke(Color(.label),lineWidth: 1)
-                            ).foregroundColor(Color(.label))
-                    VStack(alignment: .leading){
-                        Text("username").font(.system(size: 16,weight: .bold)).foregroundColor(Color(.label))
-                        Text("message to user").font(.system(size: 14))
+                        WebImage(url: URL(string: recentMessage.profileImageUrl))
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 64, height: 64)
+                            .clipped()
+                            .cornerRadius(64)
+                        
+                        
+//                    Image(systemName: "person.fill").font(.system(size: 32))
+//                            .padding(6)
+//                            .overlay(RoundedRectangle(cornerRadius: 34)
+//                                .stroke(Color(.label),lineWidth: 1)
+//                            ).foregroundColor(Color(.label))
+                        VStack(alignment: .leading, spacing:8){
+                        Text(recentMessage.email).font(.system(size: 16,weight: .bold)).foregroundColor(Color(.label))
+                        Text(recentMessage.text).font(.system(size: 14))
                             .foregroundColor(.gray)
                     }
                     Spacer()
